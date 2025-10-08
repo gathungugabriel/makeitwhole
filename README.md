@@ -47,3 +47,29 @@ Join the circular economy. Fix, save, and share.
 
 ## ⚙️ Project Structure
 
+makeitwhole/
+│
+├── backend/
+│ ├── app/
+│ │ ├── main.py
+│ │ ├── models.py
+│ │ ├── schemas.py
+│ │ ├── database.py
+│ │ └── routes/
+│ │ ├── users.py
+│ │ ├── items.py
+│ │ ├── matches.py
+│ │ └── messages.py
+│ ├── requirements.txt
+│ └── .env
+│
+├── frontend/
+│ ├── src/
+│ │ ├── pages/
+│ │ ├── components/
+│ │ ├── styles/
+│ │ └── utils/
+│ ├── package.json
+│ └── next.config.js
+│
+└── README.md
