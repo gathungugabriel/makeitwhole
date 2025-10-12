@@ -16,8 +16,9 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     date_created = Column(DateTime(timezone=True), server_default=func.now())
+    date_updated = Column(DateTime(timezone=True), onupdate=func.now())  # 👈 auto-update on edit
 
-    # Relationship to products
+    # Relationship to products (include cascade for cleanup)
     products = relationship("Product", back_populates="owner", cascade="all, delete-orphan")
 
 
@@ -29,10 +30,13 @@ class Product(Base):
     description = Column(Text)
     category = Column(String(50))
     condition = Column(String(30))
+    price = Column(Float, nullable=False)
+    quantity = Column(Integer, default=1)
     image_url = Column(String(255))
     video_url = Column(String(255))  # for video support
     owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     date_posted = Column(DateTime(timezone=True), server_default=func.now())
+    date_updated = Column(DateTime(timezone=True), onupdate=func.now())  # 👈 track updates
 
     owner = relationship("User", back_populates="products")
 
