@@ -6,7 +6,9 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from .database import Base
 
-
+# ==========================
+# 👤 USER MODEL
+# ==========================
 class User(Base):
     __tablename__ = "users"
 
@@ -16,12 +18,19 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     date_created = Column(DateTime(timezone=True), server_default=func.now())
-    date_updated = Column(DateTime(timezone=True), onupdate=func.now())  # 👈 auto-update on edit
+    date_updated = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # Relationship to products (include cascade for cleanup)
-    products = relationship("Product", back_populates="owner", cascade="all, delete-orphan")
+    # 🪝 Relationship to products
+    products = relationship(
+        "Product",
+        back_populates="owner",
+        cascade="all, delete-orphan"
+    )
 
 
+# ==========================
+# 📦 PRODUCT MODEL
+# ==========================
 class Product(Base):
     __tablename__ = "products"
 
@@ -33,14 +42,19 @@ class Product(Base):
     price = Column(Float, nullable=False)
     quantity = Column(Integer, default=1)
     image_url = Column(String(255))
-    video_url = Column(String(255))  # for video support
+    video_url = Column(String(255))  # For optional product video
     owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+
+    # 🕒 Timestamp fields
     date_posted = Column(DateTime(timezone=True), server_default=func.now())
-    date_updated = Column(DateTime(timezone=True), onupdate=func.now())  # 👈 track updates
+    date_updated = Column(DateTime(timezone=True), onupdate=func.now())
 
     owner = relationship("User", back_populates="products")
 
 
+# ==========================
+# 🔁 MATCH MODEL
+# ==========================
 class Match(Base):
     __tablename__ = "matches"
 

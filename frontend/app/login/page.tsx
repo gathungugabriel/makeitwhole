@@ -6,52 +6,71 @@ import { useRouter } from "next/navigation";
 export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setMessage("Logging in...");
 
-    const formData = new FormData();
-    formData.append("username", username);
-    formData.append("password", password);
+    try {
+      const formData = new FormData();
+      formData.append("username", username);
+      formData.append("password", password);
 
-    const res = await fetch("http://127.0.0.1:8000/users/login", {
-      method: "POST",
-      body: formData,
-    });
+      const res = await fetch("http://127.0.0.1:8000/users/login", {
+        method: "POST",
+        body: formData, // ✅ matches your backend (Form(...))
+      });
 
-    if (res.ok) {
-      const data = await res.json();
-      localStorage.setItem("token", data.access_token); // ✅ consistent key
-      alert("✅ Login successful!");
-      router.push("/create-product"); // optional redirect
-    } else {
-      alert("❌ Invalid credentials");
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem("token", data.access_token); // ✅ consistent key
+        setMessage("✅ Login successful!");
+        setTimeout(() => router.push("/create-product"), 1000);
+      } else {
+        const errText = await res.text();
+        console.error("Login failed:", errText);
+        setMessage("❌ Invalid credentials. Please try again.");
+      }
+    } catch (err) {
+      console.error("Error connecting to backend:", err);
+      setMessage("⚠️ Server connection error.");
     }
   };
 
   return (
-    <form onSubmit={handleLogin} className="flex flex-col gap-2 p-4 max-w-md mx-auto mt-10 bg-white shadow rounded">
-      <h2 className="text-xl font-semibold mb-4 text-center">Login</h2>
+    <div className="max-w-md mx-auto mt-16 p-6 bg-white rounded-lg shadow-md">
+      <h1 className="text-2xl font-semibold text-center mb-6">Login</h1>
 
-      <input
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        placeholder="Email or username"
-        className="border p-2 rounded"
-        required
-      />
-      <input
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="Password"
-        className="border p-2 rounded"
-        required
-      />
-      <button className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition" type="submit">
-        Login
-      </button>
-    </form>
+      <form onSubmit={handleLogin} className="flex flex-col gap-3">
+        <input
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="Email or username"
+          className="border p-2 rounded"
+          required
+        />
+
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+          className="border p-2 rounded"
+          required
+        />
+
+        <button
+          type="submit"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded transition"
+        >
+          Login
+        </button>
+      </form>
+
+      {message && <p className="mt-4 text-sm text-center">{message}</p>}
+    </div>
   );
 }

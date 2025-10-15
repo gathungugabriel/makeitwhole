@@ -40,10 +40,11 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": int(expire.timestamp())})  # Convert to UNIX timestamp here!
-    print(f"Token expiration time (UTC): {expire} (timestamp: {int(expire.timestamp())})")
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    to_encode.update({"exp": expire})  # ✅ use datetime directly, not timestamp
 
+    print(f"Token expiration time (UTC): {expire}")
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
 def get_current_user(
     token: HTTPAuthorizationCredentials = Depends(oauth2_scheme),
