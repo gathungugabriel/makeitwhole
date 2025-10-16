@@ -1,62 +1,31 @@
-// src/api.js
-import axios from "axios";
+// frontend/apiClient.js
+
+import axios from 'axios';
 
 const api = axios.create({
-  baseURL: "http://localhost:8000",
+  baseURL: 'http://127.0.0.1:8000', // Backend base URL
 });
 
-let isRefreshing = false;
-let refreshSubscribers = [];
+// ✅ Attach token to every request if available
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem('access_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
-const subscribeTokenRefresh = (cb) => {
-  refreshSubscribers.push(cb);
-};
-
-const onRefreshed = (token) => {
-  refreshSubscribers.map((cb) => cb(token));
-  refreshSubscribers = [];
-};
-
+// ✅ Handle 401 errors globally — force re-login
 api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      if (isRefreshing) {
-        return new Promise((resolve) => {
-          subscribeTokenRefresh((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            resolve(api(originalRequest));
-          });
-        });
-      }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        const refreshToken = localStorage.getItem("refreshToken");
-        const res = await axios.post("http://localhost:8000/refresh", {}, {
-          headers: { Authorization: `Bearer ${refreshToken}` },
-        });
-
-        const newAccessToken = res.data.access_token;
-        localStorage.setItem("token", newAccessToken);
-        api.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`;
-        onRefreshed(newAccessToken);
-
-        return api(originalRequest);
-      } catch (err) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("refreshToken");
-        window.location.href = "/login";
-      } finally {
-        isRefreshing = false;
-      }
+  res => res,
+  err => {
+    if (err.response?.status === 401) {
+      // Token expired or unauthorized
+      localStorage.removeItem('access_token'); // Clean up
+      window.location.href = '/login'; // Force re-login
     }
 
-    return Promise.reject(error);
+    return Promise.reject(err);
   }
 );
 

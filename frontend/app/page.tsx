@@ -1,34 +1,87 @@
-'use client';
+// frontend/app/login/page.tsx
+"use client";
 
-import { useEffect, useState } from 'react';
-import ProductCard from '@/components/ProductCard';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-export default function HomePage() {
-  const [products, setProducts] = useState([]);
+export default function LoginPage() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const router = useRouter();
 
-  useEffect(() => {
-    fetch('http://127.0.0.1:8000/products/')
-      .then(res => res.json())
-      .then(data => {
-        // Show only latest 4 products
-        setProducts(data.slice(0, 4));
-      })
-      .catch(err => console.error('Error fetching products:', err));
-  }, []);
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMessage("Logging in...");
+
+    try {
+      const formData = new FormData();
+      formData.append("username", username);
+      formData.append("password", password);
+
+      const res = await fetch("http://127.0.0.1:8000/users/login", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem("access_token", data.access_token); // ✅ consistent key
+        setMessage("✅ Login successful!");
+
+        setTimeout(() => {
+          router.push("/dashboard"); // Change if needed
+        }, 1000);
+      } else {
+        const errText = await res.text();
+        console.error("Login failed:", errText);
+        setMessage("❌ Invalid credentials. Please try again.");
+      }
+    } catch (err) {
+      console.error("Error connecting to backend:", err);
+      setMessage("⚠️ Server connection error.");
+    }
+  };
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">🛍️ Featured Products</h1>
+    <div className="max-w-md mx-auto mt-16 p-6 bg-white rounded-lg shadow-md">
+      <h1 className="text-2xl font-semibold text-center mb-6">Login</h1>
 
-      {products.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {products.map((product: any) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-      ) : (
-        <p className="text-gray-500">No products found.</p>
-      )}
+      <form onSubmit={handleLogin} className="flex flex-col gap-3">
+        <input
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="Email or username"
+          className="border p-2 rounded"
+          required
+        />
+
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+          className="border p-2 rounded"
+          required
+        />
+
+        <button
+          type="submit"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded transition"
+        >
+          Login
+        </button>
+      </form>
+
+      {message && <p className="mt-4 text-sm text-center">{message}</p>}
+
+      <p className="mt-4 text-sm text-center">
+        Don’t have an account?{" "}
+        <a href="/register" className="text-blue-600 hover:underline">
+          Register here
+        </a>
+      </p>
     </div>
   );
 }
