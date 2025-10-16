@@ -25,9 +25,9 @@ export default function LoginPage() {
 
       if (res.ok) {
         const data = await res.json();
-        localStorage.setItem("token", data.access_token); // ✅ consistent key
+        localStorage.setItem("access_token", data.access_token); // ✅ consistent key
         setMessage("✅ Login successful!");
-        setTimeout(() => router.push("/create-product"), 1000);
+        setTimeout(() => router.push("/dashboard"), 1000);
       } else {
         const errText = await res.text();
         console.error("Login failed:", errText);

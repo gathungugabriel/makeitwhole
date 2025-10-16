@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 export default function CreateProductPage() {
   const router = useRouter();
+
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -15,12 +16,13 @@ export default function CreateProductPage() {
     image: null as File | null,
     video: null as File | null,
   });
+
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Redirect if not logged in
+  // ✅ Redirect to login if token is missing
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("access_token"); // ✅ Correct key
     if (!token) {
       router.push("/login");
     }
@@ -45,9 +47,14 @@ export default function CreateProductPage() {
     setError("");
     setSuccess("");
 
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("access_token"); // ✅ Correct key
     if (!token) {
       setError("⚠️ You must be logged in to add a product.");
+      return router.push("/login");
+    }
+
+    if (!form.price || isNaN(parseFloat(form.price))) {
+      setError("❌ Please enter a valid price.");
       return;
     }
 
@@ -58,11 +65,6 @@ export default function CreateProductPage() {
       formData.append("category", form.category);
       formData.append("condition", form.condition);
       formData.append("price", parseFloat(form.price).toString());
-      if (!form.price || isNaN(parseFloat(form.price))) {
-  setError("Please enter a valid price.");
-  return;
-}
-
       formData.append("quantity", parseInt(form.quantity).toString());
       if (form.image) formData.append("image", form.image);
       if (form.video) formData.append("video", form.video);
@@ -104,7 +106,7 @@ export default function CreateProductPage() {
             value={form.name}
             onChange={handleChange}
             className="border rounded p-2 w-full"
-            placeholder="E.g. Colorful Traditional Kettle"
+            placeholder="E.g. Diamond Climber Earring"
           />
         </div>
 
@@ -129,7 +131,7 @@ export default function CreateProductPage() {
             value={form.category}
             onChange={handleChange}
             className="border rounded p-2 w-full"
-            placeholder="E.g. Utensils, Electronics, Furniture"
+            placeholder="E.g. Luxury Jewelry"
           />
         </div>
 
@@ -160,7 +162,7 @@ export default function CreateProductPage() {
               value={form.price}
               onChange={handleChange}
               className="border rounded p-2 w-full"
-              placeholder="e.g. 15.50"
+              placeholder="e.g. 1090"
             />
           </div>
 
