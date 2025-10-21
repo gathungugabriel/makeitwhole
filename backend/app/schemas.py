@@ -18,10 +18,14 @@ class UserOut(BaseModel):
     id: int
     username: str
     email: EmailStr
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
     date_created: datetime
     date_updated: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
 
 
 class UserLogin(BaseModel):
@@ -33,6 +37,9 @@ class UserUpdate(BaseModel):
     username: Optional[constr(min_length=3, max_length=50)] = None
     email: Optional[EmailStr] = None
     password: Optional[constr(min_length=6)] = None
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
 
 
 # ================================

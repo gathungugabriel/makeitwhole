@@ -70,7 +70,20 @@ export default function LoginPage() {
         </button>
       </form>
 
-      {message && <p className="mt-4 text-sm text-center">{message}</p>}
+      {message && (
+        <p
+          className={`mt-4 text-sm text-center ${
+            message.startsWith('✅')
+              ? 'text-green-600'
+              : message.startsWith('❌')
+              ? 'text-red-600'
+              : 'text-gray-600'
+          }`}
+        >
+    {message}
+  </p>
+)}
+
     </div>
   );
 }

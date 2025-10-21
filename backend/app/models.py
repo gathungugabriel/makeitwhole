@@ -9,6 +9,9 @@ from .database import Base
 # ==========================
 # 👤 USER MODEL
 # ==========================
+# ==========================
+# 👤 USER MODEL
+# ==========================
 class User(Base):
     __tablename__ = "users"
 
@@ -17,15 +20,21 @@ class User(Base):
     email = Column(String(120), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+
+    # 🔧 New profile fields
+    full_name = Column(String(100), nullable=True)
+    phone = Column(String(20), nullable=True)
+    address = Column(String(255), nullable=True)
+
     date_created = Column(DateTime(timezone=True), server_default=func.now())
     date_updated = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # 🪝 Relationship to products
     products = relationship(
         "Product",
         back_populates="owner",
         cascade="all, delete-orphan"
     )
+
 
 
 # ==========================
