@@ -1,4 +1,3 @@
-# backend/app/schemas.py
 from pydantic import BaseModel, EmailStr, Field, constr
 from typing import Optional
 from datetime import datetime
@@ -25,7 +24,6 @@ class UserOut(BaseModel):
     date_updated: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
-
 
 
 class UserLogin(BaseModel):
@@ -93,5 +91,15 @@ class MatchOut(BaseModel):
 # ================================
 
 class Token(BaseModel):
+    """Returned when user logs in or refreshes token."""
     access_token: str
+    refresh_token: Optional[str] = None  # optional for refresh route
     token_type: str
+    user_id: Optional[int] = None
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None
+
+
+class TokenData(BaseModel):
+    """Used internally to extract user ID from JWT."""
+    sub: Optional[str] = None

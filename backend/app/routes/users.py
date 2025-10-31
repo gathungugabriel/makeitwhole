@@ -2,20 +2,23 @@ from fastapi import APIRouter, Depends, HTTPException, status, Form
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import os
-
 from app import models, schemas
 from app.database import get_db
 from app.auth import (
     get_password_hash,
     verify_password,
     create_access_token,
+    refresh_access_token,
     get_current_user,
 )
 
-router = APIRouter()  # ✅ remove prefix here; main.py adds '/users'
+router = APIRouter()
 
 SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkey")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
+
+ACCESS_TOKEN_EXPIRE_HOURS = 12
+REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 
 # 🧩 Register new user
@@ -57,12 +60,37 @@ def login(
             detail="Invalid username/email or password",
         )
 
-    access_token_expires = timedelta(hours=12)
-    access_token = create_access_token(
-        data={"sub": str(user.id)}, expires_delta=access_token_expires
-    )
+    # Access + Refresh tokens
+    access_expires = timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
+    refresh_expires = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
 
-    return {"access_token": access_token, "token_type": "bearer"}
+    access_token = create_access_token(data={"sub": str(user.id)}, expires_delta=access_expires)
+    refresh_token = create_access_token(data={"sub": str(user.id)}, expires_delta=refresh_expires)
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "user_id": user.id,
+        "username": user.username,
+        "email": user.email,
+    }
+
+
+# ✅ Refresh token route
+@router.post("/refresh")
+def refresh_token(refresh_token: str = Form(...)):
+    """
+    Refresh access token using a valid refresh token.
+    """
+    try:
+        new_token = refresh_access_token(refresh_token)
+        return new_token
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
 
 
 # ✅ Get all users (for testing/admin)

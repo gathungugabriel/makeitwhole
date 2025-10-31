@@ -1,5 +1,3 @@
-# backend/app/auth.py
-
 from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt, ExpiredSignatureError
 from passlib.context import CryptContext
@@ -12,108 +10,22 @@ import os
 from app import models
 from app.database import get_db
 
-# Load environment variables from .env file
+# ---------------------------------------------------------
+# Load environment variables
+# ---------------------------------------------------------
 load_dotenv()
 
-# Config
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key")
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
-
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# HTTP Bearer scheme for token extraction
-oauth2_scheme = HTTPBearer()
-
-# ---------------------------------------------------------
-# Password Hashing Utilities
-# ---------------------------------------------------------
-def get_password_hash(password: str) -> str:
-    """Hash plain password"""
-    return pwd_context.hash(password)
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify plain password against hashed password"""
-    return pwd_context.verify(plain_password, hashed_password)
-
-# ---------------------------------------------------------
-# Token Creation
-# ---------------------------------------------------------
-def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
-    """Generate a JWT token with an expiration time"""
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": expire})
-    print(f"🕒 Token expiration time (UTC): {expire}")
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-# ---------------------------------------------------------
-# Token Validation
-# ---------------------------------------------------------
-def get_current_user(
-    token: HTTPAuthorizationCredentials = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-):
-    """Decode JWT token and return the corresponding user from DB"""
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid or expired token. Please log in again.",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-    token_str = token.credentials
-
-    try:
-        payload = jwt.decode(token_str, SECRET_KEY, algorithms=[ALGORITHM])
-        print("Decoded JWT payload:", payload)
-        print("Current UTC time:", datetime.now(timezone.utc))
-
-        user_id = payload.get("sub")
-        if user_id is None:
-            raise credentials_exception
-        user_id = int(user_id)
-
-    except ExpiredSignatureError:
-        print("⚠️ JWT token expired.")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired. Please log in again.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    except JWTError as e:
-        print(f"❌ JWT validation error: {e}")
-        raise credentials_exception
-# backend/app/auth.py
-
-from datetime import datetime, timedelta, timezone
-from jose import JWTError, jwt, ExpiredSignatureError
-from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
-from dotenv import load_dotenv
-import os
-
-from app import models
-from app.database import get_db
-
-# Load environment variables from .env file
-load_dotenv()
-
-# Config
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key")
 REFRESH_SECRET_KEY = os.getenv("REFRESH_SECRET_KEY", "your-refresh-secret-key")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))  # short lifespan
-REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))       # long lifespan
 
-# Password hashing context
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))   # short lifespan
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))        # long lifespan
+
+# ---------------------------------------------------------
+# Password hashing setup
+# ---------------------------------------------------------
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# HTTP Bearer scheme for token extraction
 oauth2_scheme = HTTPBearer(auto_error=False)
 
 # ---------------------------------------------------------
@@ -128,29 +40,27 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 # ---------------------------------------------------------
-# Token Creation
+# Token Creation Utilities
 # ---------------------------------------------------------
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """Generate a short-lived access token"""
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def create_refresh_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """Generate a long-lived refresh token"""
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, REFRESH_SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, REFRESH_SECRET_KEY, algorithm=ALGORITHM)
 
 # ---------------------------------------------------------
 # Token Verification
 # ---------------------------------------------------------
 def verify_token(token: str, key: str, error_message: str):
-    """Decode and verify token"""
+    """Decode and verify token validity"""
     try:
         payload = jwt.decode(token, key, algorithms=[ALGORITHM])
         return payload
@@ -174,7 +84,7 @@ def get_current_user(
     token: HTTPAuthorizationCredentials = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ):
-    """Decode JWT token and return user"""
+    """Decode JWT and return the corresponding user"""
     if token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -186,7 +96,7 @@ def get_current_user(
     payload = verify_token(token_str, SECRET_KEY, "Invalid or expired access token.")
     user_id = payload.get("sub")
 
-    if user_id is None:
+    if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
 
     user = db.query(models.User).filter(models.User.id == int(user_id)).first()
@@ -203,14 +113,8 @@ def refresh_access_token(refresh_token: str):
     payload = verify_token(refresh_token, REFRESH_SECRET_KEY, "Invalid or expired refresh token.")
     user_id = payload.get("sub")
 
-    if user_id is None:
+    if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token payload")
 
     new_access_token = create_access_token({"sub": user_id})
     return {"access_token": new_access_token, "token_type": "bearer"}
-
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if user is None:
-        raise credentials_exception
-
-    return user
