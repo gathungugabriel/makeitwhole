@@ -9,13 +9,13 @@ from app.database import Base, engine
 from app import models
 from app.routes import users, products
 from app import routes_auth  
-from app.oauth import router as oauth_router
+# from app.oauth import router as oauth_router
 
 
 
 # ✅ Initialize FastAPI
 app = FastAPI(title="MakeItWhole API", version="1.0")
-app.include_router(oauth_router)
+# app.include_router(oauth_router)
 
 # ✅ Initialize database
 print("🔄 Checking database and creating tables if needed...")

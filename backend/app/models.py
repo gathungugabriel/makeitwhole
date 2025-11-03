@@ -9,9 +9,6 @@ from .database import Base
 # ==========================
 # 👤 USER MODEL
 # ==========================
-# ==========================
-# 👤 USER MODEL
-# ==========================
 class User(Base):
     __tablename__ = "users"
 
@@ -20,6 +17,9 @@ class User(Base):
     email = Column(String(120), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+
+    # 👇 Add this line
+    provider = Column(String(50), default="local", nullable=False)
 
     # 🔧 New profile fields
     full_name = Column(String(100), nullable=True)

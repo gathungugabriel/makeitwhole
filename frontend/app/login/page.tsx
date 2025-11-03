@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import api from "@/lib/apiClient"; // your axios instance
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -18,24 +19,27 @@ export default function LoginPage() {
       formData.append("username", username);
       formData.append("password", password);
 
-      const res = await fetch("http://127.0.0.1:8000/users/login", {
-        method: "POST",
-        body: formData, // ✅ matches your backend (Form(...))
-      });
+      // Use api (axios). Axios will set multipart headers automatically for FormData.
+      const res = await api.post("/users/login", formData);
 
-      if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem("access_token", data.access_token); // ✅ consistent key
-        setMessage("✅ Login successful!");
-        setTimeout(() => router.push("/dashboard"), 1000);
-      } else {
-        const errText = await res.text();
-        console.error("Login failed:", errText);
-        setMessage("❌ Invalid credentials. Please try again.");
+      // your backend returns access_token and refresh_token
+      const data = res.data;
+      if (data.access_token) {
+        localStorage.setItem("access_token", data.access_token);
       }
-    } catch (err) {
-      console.error("Error connecting to backend:", err);
-      setMessage("⚠️ Server connection error.");
+      if (data.refresh_token) {
+        localStorage.setItem("refresh_token", data.refresh_token);
+      }
+      if (data.user_id) {
+        localStorage.setItem("user_id", String(data.user_id));
+      }
+
+      setMessage("✅ Login successful!");
+      setTimeout(() => router.push("/dashboard"), 900);
+    } catch (err: any) {
+      console.error("Login failed:", err);
+      const errMsg = err.response?.data?.detail || err.message || "Invalid credentials";
+      setMessage(`❌ ${errMsg}`);
     }
   };
 
@@ -52,7 +56,6 @@ export default function LoginPage() {
           className="border p-2 rounded"
           required
         />
-
         <input
           type="password"
           value={password}
@@ -68,22 +71,38 @@ export default function LoginPage() {
         >
           Login
         </button>
+
+        <div className="relative my-4 text-center">
+        <span className="text-gray-400 text-sm">or</span>
+        </div>
+
+        <a
+          href="http://127.0.0.1:8000/auth/google"
+          className="flex items-center justify-center gap-2 bg-white border rounded p-2 text-gray-700 hover:bg-gray-100 transition"
+        >
+          <img src="/google-icon.svg.png" alt="Google" className="w-5 h-5" />
+          Continue with Google
+        </a>
+
       </form>
 
       {message && (
         <p
           className={`mt-4 text-sm text-center ${
-            message.startsWith('✅')
-              ? 'text-green-600'
-              : message.startsWith('❌')
-              ? 'text-red-600'
-              : 'text-gray-600'
+            message.startsWith("✅") ? "text-green-600" :
+            message.startsWith("❌") ? "text-red-600" : "text-gray-600"
           }`}
         >
-    {message}
-  </p>
-)}
+          {message}
+        </p>
+      )}
 
+      <p className="text-sm text-center mt-4">
+        Don’t have an account?{" "}
+        <a href="/register" className="text-blue-600 hover:underline">
+          Register here
+        </a>
+      </p>
     </div>
   );
 }

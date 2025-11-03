@@ -1,4 +1,5 @@
 "use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/apiClient";
@@ -9,29 +10,34 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const router = useRouter();
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
     setError("");
     setMsg("");
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Basic validation
     if (!form.username || !form.email || !form.password) {
       setError("⚠️ All fields are required.");
       return;
     }
 
     try {
-      const res = await api.post("/users/register", form);
+      // Register expects JSON body in your backend
+      const res = await api.post("/users/register", {
+        username: form.username,
+        email: form.email,
+        password: form.password,
+      });
+
       setMsg(`✅ Registered as ${res.data.username}. Redirecting to login...`);
-      setTimeout(() => router.push("/login"), 1500);
-    } catch (err) {
+      setTimeout(() => router.push("/login"), 1400);
+    } catch (err: any) {
       console.error("Registration failed:", err);
-      const detail = err.response?.data?.detail;
-      setError(`❌ ${detail || "Registration failed."}`);
+      const detail = err.response?.data?.detail || err.message;
+      setError(`❌ ${detail}`);
     }
   };
 
@@ -75,6 +81,21 @@ export default function RegisterPage() {
         >
           Register
         </button>
+
+        <div className="relative my-4 text-center">
+        <span className="text-gray-400 text-sm">or</span>
+        </div>
+
+        <a
+        href="http://127.0.0.1:8000/auth/google"
+        className="flex items-center justify-center gap-2 bg-white border rounded p-2 text-gray-700 hover:bg-gray-100 transition"
+        >
+        <img src="/google-icon.svg.png" alt="Google"  className="w-5 h-5" />
+        Continue with Google
+        </a>
+
+
+
       </form>
 
       <p className="text-sm text-center mt-4">
