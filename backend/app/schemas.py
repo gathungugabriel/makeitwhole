@@ -1,12 +1,12 @@
 from pydantic import BaseModel, EmailStr, Field, constr
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
+import json
 
 
-# ================================
-#              USERS
-# ================================
-
+# ======================================================
+#                       USERS
+# ======================================================
 class UserCreate(BaseModel):
     username: constr(min_length=3, max_length=50)
     email: EmailStr
@@ -40,42 +40,65 @@ class UserUpdate(BaseModel):
     address: Optional[str] = None
 
 
-# ================================
-#            PRODUCTS
-# ================================
-
-class ProductCreate(BaseModel):
+# ======================================================
+#                       PRODUCTS
+# ======================================================
+class ProductBase(BaseModel):
     name: constr(min_length=1, max_length=100)
-    description: str
-    category: str
-    condition: str
-    price: float = Field(..., ge=0, description="Product price must be 0 or more.")
-    quantity: Optional[int] = Field(default=1, ge=1, le=1000)
+    description: Optional[str] = None
+    category: Optional[str] = None
+    condition: Optional[str] = None
+    price: float = Field(default=0, ge=0)
+    quantity: int = Field(default=1, ge=1, le=1000)
+    image_url: Optional[str] = None  # raw storage (JSON string or single URL)
+    video_url: Optional[str] = None
+    item_type: Optional[str] = Field(default="have", pattern="^(have|need)$")
+
+    def get_image_list(self) -> List[str]:
+        """Parse image_url JSON into a list of URLs."""
+        if not self.image_url:
+            return []
+        try:
+            urls = json.loads(self.image_url)
+            return urls if isinstance(urls, list) else [urls]
+        except Exception:
+            return [self.image_url]
+
+
+class ProductCreate(ProductBase):
+    pass
+
+
+class ProductUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    condition: Optional[str] = None
+    price: Optional[float] = None
+    quantity: Optional[int] = None
     image_url: Optional[str] = None
     video_url: Optional[str] = None
+    item_type: Optional[str] = Field(default=None, pattern="^(have|need)$")
 
 
-class ProductOut(BaseModel):
+class ProductOut(ProductBase):
     id: int
-    name: str
-    description: Optional[str]
-    category: Optional[str]
-    condition: Optional[str]
-    price: float
-    quantity: int
-    image_url: Optional[str]
-    video_url: Optional[str]
     owner_id: int
     date_posted: datetime
     date_updated: Optional[datetime] = None
 
+    # ✅ Include parsed image URLs as a list
+    images: List[str] = []
+
     model_config = {"from_attributes": True}
 
+    def model_post_init(self, __context):
+        self.images = self.get_image_list()
 
-# ================================
-#             MATCHES
-# ================================
 
+# ======================================================
+#                       MATCHES
+# ======================================================
 class MatchOut(BaseModel):
     id: int
     product_a_id: int
@@ -86,14 +109,12 @@ class MatchOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ================================
-#           AUTH TOKEN
-# ================================
-
+# ======================================================
+#                     AUTH TOKEN
+# ======================================================
 class Token(BaseModel):
-    """Returned when user logs in or refreshes token."""
     access_token: str
-    refresh_token: Optional[str] = None  # optional for refresh route
+    refresh_token: Optional[str] = None
     token_type: str
     user_id: Optional[int] = None
     username: Optional[str] = None
@@ -101,5 +122,4 @@ class Token(BaseModel):
 
 
 class TokenData(BaseModel):
-    """Used internally to extract user ID from JWT."""
     sub: Optional[str] = None

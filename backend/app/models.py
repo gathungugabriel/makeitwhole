@@ -1,10 +1,10 @@
-# backend/app/models.py
 from sqlalchemy import (
     Column, Integer, String, Text, ForeignKey, Float,
     DateTime, Boolean, func
 )
 from sqlalchemy.orm import relationship
 from .database import Base
+
 
 # ==========================
 # 👤 USER MODEL
@@ -18,10 +18,9 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
 
-    # 👇 Add this line
     provider = Column(String(50), default="local", nullable=False)
 
-    # 🔧 New profile fields
+    # Optional profile fields
     full_name = Column(String(100), nullable=True)
     phone = Column(String(20), nullable=True)
     address = Column(String(255), nullable=True)
@@ -34,7 +33,6 @@ class User(Base):
         back_populates="owner",
         cascade="all, delete-orphan"
     )
-
 
 
 # ==========================
@@ -51,8 +49,11 @@ class Product(Base):
     price = Column(Float, nullable=False)
     quantity = Column(Integer, default=1)
     image_url = Column(String(255))
-    video_url = Column(String(255))  # For optional product video
+    video_url = Column(String(255))
     owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+
+    # 🆕 Indicates whether the listing is an item someone "has" or "needs"
+    item_type = Column(String(10), default="have", nullable=False)
 
     # 🕒 Timestamp fields
     date_posted = Column(DateTime(timezone=True), server_default=func.now())

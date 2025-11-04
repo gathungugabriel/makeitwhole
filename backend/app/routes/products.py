@@ -2,10 +2,12 @@ from fastapi import (
     APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 )
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from typing import List, Optional
 from datetime import datetime
 import os
 import shutil
+import json
 import cloudinary
 import cloudinary.uploader
 
@@ -29,76 +31,76 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-router = APIRouter()  # main.py handles prefix '/products'
+router = APIRouter(prefix="/products", tags=["Products"])
 
-
-# ✅ Create product
+# ============================================================
+#                    CREATE PRODUCT
+# ============================================================
 @router.post("/", response_model=schemas.ProductOut, status_code=status.HTTP_201_CREATED)
 def create_product(
     name: str = Form(...),
     description: Optional[str] = Form(None),
     category: Optional[str] = Form(None),
     condition: Optional[str] = Form(None),
-    price: float = Form(...),
-    quantity: int = Form(...),
-    image: Optional[UploadFile] = File(None),
+    have_or_need: str = Form(...),
+    price: Optional[float] = Form(0),
+    quantity: int = Form(1),
+    images: Optional[List[UploadFile]] = File(None),
     video: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    """Create a new product — keeps original filenames for consistent image URLs."""
-    image_url, video_url = None, None
+    """Create a product supporting multiple images and one video."""
+
+    if have_or_need.lower() not in ["have", "need"]:
+        raise HTTPException(status_code=400, detail="Invalid value for have_or_need")
+
+    image_urls = []
+    video_url = None
 
     try:
-        # ✅ Handle image upload
-        if image:
-            if UPLOAD_MODE == "cloudinary":
-                upload_result = cloudinary.uploader.upload(
-                    image.file, folder="makeitwhole/products/images"
-                )
-                image_url = upload_result.get("secure_url")
-            else:
-                # Keep original filename but ensure uniqueness
-                orig_name, ext = os.path.splitext(image.filename)
-                safe_name = orig_name.replace(" ", "_")
-                timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-                final_name = f"{timestamp}_{safe_name}{ext}"
+        # ✅ Upload multiple images
+        if images:
+            for img in images:
+                if UPLOAD_MODE == "cloudinary":
+                    result = cloudinary.uploader.upload(
+                        img.file,
+                        folder="makeitwhole/products/images"
+                    )
+                    image_urls.append(result.get("secure_url"))
+                else:
+                    filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{img.filename}"
+                    filepath = os.path.join(UPLOAD_DIR, filename)
+                    with open(filepath, "wb") as buffer:
+                        shutil.copyfileobj(img.file, buffer)
+                    image_urls.append(f"/uploads/{filename}")
 
-                image_path = os.path.join(UPLOAD_DIR, final_name)
-                with open(image_path, "wb") as buffer:
-                    shutil.copyfileobj(image.file, buffer)
-
-                # ✅ Match frontend expectation: starts with /uploads/
-                image_url = f"/uploads/{final_name}"
-
-        # ✅ Handle video upload (same idea)
+        # ✅ Upload video
         if video:
             if UPLOAD_MODE == "cloudinary":
-                upload_result = cloudinary.uploader.upload(
-                    video.file, resource_type="video", folder="makeitwhole/products/videos"
+                result = cloudinary.uploader.upload(
+                    video.file,
+                    resource_type="video",
+                    folder="makeitwhole/products/videos"
                 )
-                video_url = upload_result.get("secure_url")
+                video_url = result.get("secure_url")
             else:
-                orig_name, ext = os.path.splitext(video.filename)
-                safe_name = orig_name.replace(" ", "_")
-                timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-                final_name = f"{timestamp}_{safe_name}{ext}"
-
-                video_path = os.path.join(UPLOAD_DIR, final_name)
-                with open(video_path, "wb") as buffer:
+                filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{video.filename}"
+                filepath = os.path.join(UPLOAD_DIR, filename)
+                with open(filepath, "wb") as buffer:
                     shutil.copyfileobj(video.file, buffer)
+                video_url = f"/uploads/{filename}"
 
-                video_url = f"/uploads/{final_name}"
-
-        # ✅ Save product
+        # ✅ Store JSON of image URLs
         new_product = models.Product(
             name=name,
             description=description,
             category=category,
             condition=condition,
-            price=price,
+            item_type=have_or_need.lower(),
+            price=price or 0,
             quantity=quantity,
-            image_url=image_url,
+            image_url=json.dumps(image_urls) if image_urls else None,
             video_url=video_url,
             owner_id=current_user.id,
         )
@@ -110,49 +112,88 @@ def create_product(
 
     except Exception as e:
         print(f"❌ Error creating product: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to create product.")
+        raise HTTPException(status_code=500, detail="Failed to create product")
 
 
-# ✅ List all products (public)
+# ============================================================
+#                    LIST PRODUCTS
+# ============================================================
 @router.get("/", response_model=List[schemas.ProductOut])
-def list_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return db.query(models.Product).offset(skip).limit(limit).all()
+def list_products(
+    search: Optional[str] = None,
+    item_type: Optional[str] = None,
+    category: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+):
+    """List products with optional search, type, and category filters."""
+    query = db.query(models.Product)
+
+    if item_type in ["have", "need"]:
+        query = query.filter(models.Product.item_type == item_type)
+
+    if category:
+        query = query.filter(models.Product.category.ilike(f"%{category}%"))
+
+    if search:
+        search_term = f"%{search.lower()}%"
+        query = query.filter(
+            or_(
+                models.Product.name.ilike(search_term),
+                models.Product.description.ilike(search_term),
+                models.Product.category.ilike(search_term)
+            )
+        )
+
+    query = query.order_by(models.Product.id.desc())
+    return query.offset(skip).limit(limit).all()
 
 
-# ✅ My products (user)
+# ============================================================
+#                    MY PRODUCTS
+# ============================================================
 @router.get("/me", response_model=List[schemas.ProductOut])
 def list_my_products(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    """Return products belonging to the current user."""
     return db.query(models.Product).filter(models.Product.owner_id == current_user.id).all()
 
 
-# ✅ Get single product
+# ============================================================
+#                    GET SINGLE PRODUCT
+# ============================================================
 @router.get("/{product_id}", response_model=schemas.ProductOut)
 def get_product(product_id: int, db: Session = Depends(get_db)):
+    """Fetch a single product by ID."""
     product = db.query(models.Product).filter(models.Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
 
 
-# ✅ Update product
+# ============================================================
+#                    UPDATE PRODUCT
+# ============================================================
 @router.put("/{product_id}", response_model=schemas.ProductOut)
 def update_product(
     product_id: int,
-    product_in: schemas.ProductCreate,
+    product_in: schemas.ProductUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    """Update an existing product."""
     product = db.query(models.Product).filter(models.Product.id == product_id).first()
+
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
     if product.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to update this product")
 
-    for field, value in product_in.model_dump().items():
+    for field, value in product_in.model_dump(exclude_unset=True).items():
         setattr(product, field, value)
 
     db.commit()
@@ -160,14 +201,18 @@ def update_product(
     return product
 
 
-# ✅ Delete product
+# ============================================================
+#                    DELETE PRODUCT
+# ============================================================
 @router.delete("/{product_id}", status_code=status.HTTP_200_OK)
 def delete_product(
     product_id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    """Delete a product owned by the current user."""
     product = db.query(models.Product).filter(models.Product.id == product_id).first()
+
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 

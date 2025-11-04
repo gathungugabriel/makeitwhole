@@ -8,35 +8,31 @@ import os
 from app.database import Base, engine
 from app import models
 from app.routes import users, products
-from app import routes_auth  
-# from app.oauth import router as oauth_router
-
-
+from app import routes_auth
 
 # ✅ Initialize FastAPI
 app = FastAPI(title="MakeItWhole API", version="1.0")
-# app.include_router(oauth_router)
 
 # ✅ Initialize database
 print("🔄 Checking database and creating tables if needed...")
 Base.metadata.create_all(bind=engine)
 print("✅ Database tables are ready!")
 
-# ✅ CORS (Next.js frontend)
+# ✅ CORS (for Next.js frontend)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "http://192.168.0.106:3000",
+        "http://192.168.0.106:3000",  # optional local network access
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ✅ Prepare uploads folder (ensure inside backend/uploads)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# ✅ Prepare uploads folder (ensure it matches where products.py saves files)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # go up one level
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
