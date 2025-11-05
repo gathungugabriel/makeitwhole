@@ -1,53 +1,75 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
+import React from "react";
+import Link from "next/link";
 
-type Product = {
+interface Product {
   id: number;
   name: string;
-  description?: string;
+  description: string;
+  category: string;
+  condition: string;
   price: number;
-  image_url?: string;
-  category?: string;
-  condition?: string;
-};
+  quantity: number;
+  images?: string[];
+  video_url?: string;
+  item_type?: string;
+}
 
 export default function ProductCard({ product }: { product: Product }) {
-  const imageSrc = product.image_url
-    ? product.image_url.startsWith('http')
-      ? product.image_url
-      : `http://127.0.0.1:8000${product.image_url.startsWith('/') ? '' : '/'}${product.image_url}`
+  const firstImage =
+    product.images && product.images.length > 0
+      ? product.images[0].startsWith("http")
+        ? product.images[0]
+        : `http://127.0.0.1:8000${product.images[0]}`
+      : null;
+
+  const videoSrc = product.video_url
+    ? product.video_url.startsWith("http")
+      ? product.video_url
+      : `http://127.0.0.1:8000${product.video_url}`
     : null;
 
+  const placeholder = "/placeholder.png";
+
   return (
-    <Link href={`/dashboard/products/${product.id}`} className="block">
-      <div className="border rounded-2xl shadow-md overflow-hidden hover:shadow-lg transition-all hover:scale-[1.02]">
-        {imageSrc ? (
-          <img
-            src={imageSrc}
-            alt={product.name}
-            className="w-full h-48 object-cover"
-          />
+    <div className="border rounded-2xl shadow-md p-4 flex flex-col hover:shadow-lg transition bg-white overflow-hidden">
+      <div className="relative w-full h-48 rounded-xl overflow-hidden mb-3">
+        {firstImage ? (
+          <img src={firstImage} alt={product.name} className="w-full h-full object-cover" />
+        ) : videoSrc ? (
+          <video src={videoSrc} controls className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-48 flex items-center justify-center bg-gray-100 text-gray-400">
-            No image
-          </div>
+          <img src={placeholder} alt="No media" className="w-full h-full object-cover" />
         )}
-
-        <div className="p-4">
-          <h2 className="text-lg font-semibold mb-2">{product.name}</h2>
-          <p className="text-gray-600 text-sm line-clamp-2">{product.description}</p>
-
-          <div className="mt-3 flex items-center justify-between">
-            <span className="text-green-600 font-semibold">
-              ${product.price.toFixed(2)}
-            </span>
-            <span className="text-xs text-gray-500">
-              {product.category || 'Uncategorized'}
-            </span>
-          </div>
-        </div>
       </div>
-    </Link>
+
+      <h3 className="text-lg font-semibold truncate">{product.name}</h3>
+      <p className="text-gray-600 text-sm line-clamp-2">{product.description}</p>
+
+      <div className="flex justify-between items-center mt-2 text-sm text-gray-700">
+        <span className="bg-gray-100 px-2 py-1 rounded-lg">{product.category}</span>
+        <span className="font-semibold text-blue-700">${product.price ?? "—"}</span>
+      </div>
+
+      {product.item_type && (
+        <div
+          className={`mt-2 text-sm font-medium px-3 py-1 rounded-lg text-center ${
+            product.item_type === "have"
+              ? "bg-green-100 text-green-700"
+              : "bg-yellow-100 text-yellow-700"
+          }`}
+        >
+          {product.item_type === "have" ? "I Have This" : "I Need This"}
+        </div>
+      )}
+
+      <Link
+        href={`/dashboard/products/${product.id}`}
+        className="mt-4 text-center bg-blue-600 text-white py-2 rounded-xl hover:bg-blue-700 transition"
+      >
+        View Details
+      </Link>
+    </div>
   );
 }

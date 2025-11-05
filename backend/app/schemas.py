@@ -1,8 +1,7 @@
-from pydantic import BaseModel, EmailStr, Field, constr
-from typing import Optional, List
+from pydantic import BaseModel, EmailStr, Field, constr, field_validator
+from typing import Optional, List, Union
 from datetime import datetime
 import json
-
 
 # ======================================================
 #                       USERS
@@ -50,14 +49,16 @@ class ProductBase(BaseModel):
     condition: Optional[str] = None
     price: float = Field(default=0, ge=0)
     quantity: int = Field(default=1, ge=1, le=1000)
-    image_url: Optional[str] = None  # raw storage (JSON string or single URL)
+    image_url: Optional[Union[str, List[str]]] = None  # can be JSON string or list
     video_url: Optional[str] = None
     item_type: Optional[str] = Field(default="have", pattern="^(have|need)$")
 
     def get_image_list(self) -> List[str]:
-        """Parse image_url JSON into a list of URLs."""
+        """Parse image_url JSON or plain string into a list of URLs."""
         if not self.image_url:
             return []
+        if isinstance(self.image_url, list):
+            return self.image_url
         try:
             urls = json.loads(self.image_url)
             return urls if isinstance(urls, list) else [urls]
@@ -66,6 +67,7 @@ class ProductBase(BaseModel):
 
 
 class ProductCreate(ProductBase):
+    """Schema for creating a new product"""
     pass
 
 
@@ -76,24 +78,46 @@ class ProductUpdate(BaseModel):
     condition: Optional[str] = None
     price: Optional[float] = None
     quantity: Optional[int] = None
-    image_url: Optional[str] = None
+    image_url: Optional[Union[str, List[str]]] = None
     video_url: Optional[str] = None
     item_type: Optional[str] = Field(default=None, pattern="^(have|need)$")
 
 
-class ProductOut(ProductBase):
+class ProductOut(BaseModel):
     id: int
     owner_id: int
+    name: str
+    description: Optional[str]
+    category: Optional[str]
+    condition: Optional[str]
+    price: float
+    quantity: int
+    image_url: List[str] = []          # always a list
+    video_url: Optional[str] = None
+    item_type: Optional[str] = None
     date_posted: datetime
     date_updated: Optional[datetime] = None
 
-    # ✅ Include parsed image URLs as a list
-    images: List[str] = []
-
     model_config = {"from_attributes": True}
 
-    def model_post_init(self, __context):
-        self.images = self.get_image_list()
+    @field_validator("image_url", mode="before")
+    def normalize_images(cls, v):
+        """Ensure image_url is always a list of URLs."""
+        if not v:
+            return []
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return parsed
+                elif isinstance(parsed, str):
+                    return [parsed]
+            except Exception:
+                return [v]
+        return [str(v)]
+
 
 
 # ======================================================
