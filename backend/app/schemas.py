@@ -93,7 +93,7 @@ class ProductOut(BaseModel):
     price: float
     quantity: int
     image_url: List[str] = []          # always a list
-    video_url: Optional[str] = None
+    video_url: Optional[str] = None    # single URL or None
     item_type: Optional[str] = None
     date_posted: datetime
     date_updated: Optional[datetime] = None
@@ -117,6 +117,25 @@ class ProductOut(BaseModel):
             except Exception:
                 return [v]
         return [str(v)]
+
+    @field_validator("video_url", mode="before")
+    def normalize_video(cls, v):
+        """Ensure video_url is a plain string (first element if list/JSON)."""
+        if not v:
+            return None
+        if isinstance(v, list):
+            return v[0]
+        if isinstance(v, str):
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list) and parsed:
+                    return parsed[0]
+                elif isinstance(parsed, str):
+                    return parsed
+            except Exception:
+                return v
+        return str(v)
+
 
 
 

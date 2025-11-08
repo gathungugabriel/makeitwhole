@@ -6,7 +6,7 @@ import os
 from app.database import Base, engine
 from app import models
 from app.routes import users, products
-from app import routes_auth  # ✅ existing auth file
+from app import routes_auth
 
 # ✅ Initialize FastAPI
 app = FastAPI(title="MakeItWhole API", version="1.0")
@@ -16,10 +16,10 @@ print("🔄 Checking database and creating tables if needed...")
 Base.metadata.create_all(bind=engine)
 print("✅ Database tables are ready!")
 
-# ✅ CORS
+# ✅ CORS setup
 app.add_middleware(
     CORSMiddleware,
-        allow_origins=[
+    allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:3001",
@@ -31,14 +31,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ Uploads
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+# ✅ Upload directory setup
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))  # backend/backend
+UPLOAD_DIR = os.path.join(ROOT_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+print(f"📂 Upload directory: {UPLOAD_DIR}")
+
+# ✅ Serve uploaded files correctly
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
-# ✅ Routers
+# ✅ Include routers
 app.include_router(routes_auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(users.router, prefix="/users", tags=["Users"])
 app.include_router(products.router, prefix="/products", tags=["Products"])
