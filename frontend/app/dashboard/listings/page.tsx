@@ -11,10 +11,14 @@ interface Product {
   condition?: string;
   price: number;
   quantity: number;
+  image_url?: string | string[];
   images?: string[];
   video_url?: string;
   item_type?: 'have' | 'need';
 }
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000';
 
 export default function MyProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -26,8 +30,14 @@ export default function MyProductsPage() {
   const [replaceImages, setReplaceImages] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+  const token =
+    typeof window !== 'undefined'
+      ? localStorage.getItem('access_token')
+      : null;
 
+  // -------------------------------------------------------------
+  // 🧭 Fetch My Products
+  // -------------------------------------------------------------
   useEffect(() => {
     if (!token) {
       window.location.href = '/login';
@@ -38,21 +48,28 @@ export default function MyProductsPage() {
 
   async function fetchMyProducts() {
     try {
-      const res = await fetch('http://127.0.0.1:8000/products/me', {
+      const res = await fetch(`${API_BASE_URL}/products/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to load your products');
       const data = await res.json();
 
       // ✅ Normalize image structure
-      const normalized = data.map((p: any) => ({
-        ...p,
-        images: Array.isArray(p.image_url)
-          ? p.image_url
-          : p.image_url
-          ? [p.image_url]
-          : [],
-      }));
+      const normalized = data.map((p: any) => {
+        let images: string[] = [];
+        if (Array.isArray(p.image_url)) {
+          images = p.image_url;
+        } else if (typeof p.image_url === 'string') {
+          try {
+            const parsed = JSON.parse(p.image_url);
+            if (Array.isArray(parsed)) images = parsed;
+            else images = [p.image_url];
+          } catch {
+            images = [p.image_url];
+          }
+        }
+        return { ...p, images };
+      });
 
       setProducts(normalized);
     } catch (err) {
@@ -63,22 +80,28 @@ export default function MyProductsPage() {
     }
   }
 
+  // -------------------------------------------------------------
+  // 🗑️ Delete Product
+  // -------------------------------------------------------------
   async function handleDelete(productId: number) {
     if (!confirm('Are you sure you want to delete this product?')) return;
     try {
-      const res = await fetch(`http://127.0.0.1:8000/products/${productId}`, {
+      const res = await fetch(`${API_BASE_URL}/products/${productId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to delete product');
       alert('✅ Product deleted successfully!');
-      fetchMyProducts();
+      setProducts((prev) => prev.filter((p) => p.id !== productId));
     } catch (err) {
       console.error('Delete error:', err);
       alert('❌ Failed to delete product.');
     }
   }
 
+  // -------------------------------------------------------------
+  // ✏️ Edit / Update Product
+  // -------------------------------------------------------------
   function handleEdit(product: Product) {
     setSelectedProduct(product);
     setNewImages([]);
@@ -106,16 +129,23 @@ export default function MyProductsPage() {
       if (replaceImages) formData.append('replace_images', 'true');
       newImages.forEach((file) => formData.append('images', file));
 
-      const res = await fetch(`http://127.0.0.1:8000/products/${selectedProduct.id}`, {
+      const res = await fetch(`${API_BASE_URL}/products/${selectedProduct.id}`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 
       if (!res.ok) throw new Error('Failed to update product');
+
+      const updated = await res.json();
+
       alert('✅ Product updated successfully!');
       setShowModal(false);
       setNewImages([]);
+      setReplaceImages(false);
+      setSelectedProduct(null);
+
+      // Re-fetch updated list
       fetchMyProducts();
     } catch (err) {
       console.error('Update error:', err);
@@ -125,6 +155,18 @@ export default function MyProductsPage() {
     }
   }
 
+  // -------------------------------------------------------------
+  // 🖼️ Helper to safely format image URLs
+  // -------------------------------------------------------------
+  function formatImageUrl(url: string): string {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+  }
+
+  // -------------------------------------------------------------
+  // 🧱 Render
+  // -------------------------------------------------------------
   if (loading) return <div className="p-6 text-gray-700">Loading your products...</div>;
   if (error) return <div className="p-6 text-red-600">{error}</div>;
 
@@ -132,32 +174,39 @@ export default function MyProductsPage() {
     <div className="p-6">
       <h1 className="text-3xl font-bold text-gray-800 mb-6">My Listings</h1>
 
-      {products.length === 0 && <p className="text-gray-600">You have no products listed yet.</p>}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-        {products.map((product) => (
-          <div
-            key={product.id}
-            className="relative rounded-lg overflow-hidden shadow-md hover:shadow-lg transition bg-white group"
-          >
-            <ProductCard product={product} />
-            <div className="absolute top-3 right-3 hidden group-hover:flex gap-2">
-              <button
-                onClick={() => handleEdit(product)}
-                className="bg-blue-600 text-white text-xs px-2 py-1 rounded hover:bg-blue-700"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => handleDelete(product.id)}
-                className="bg-red-600 text-white text-xs px-2 py-1 rounded hover:bg-red-700"
-              >
-                Delete
-              </button>
+      {products.length === 0 ? (
+        <p className="text-gray-600">You have no products listed yet.</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          {products.map((product) => (
+            <div
+              key={product.id}
+              className="relative rounded-lg overflow-hidden shadow-md hover:shadow-lg transition bg-white group"
+            >
+              <ProductCard
+                product={{
+                  ...product,
+                  images: product.images?.map((u) => formatImageUrl(u)) ?? [],
+                }}
+              />
+              <div className="absolute top-3 right-3 hidden group-hover:flex gap-2">
+                <button
+                  onClick={() => handleEdit(product)}
+                  className="bg-blue-600 text-white text-xs px-2 py-1 rounded hover:bg-blue-700"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleDelete(product.id)}
+                  className="bg-red-600 text-white text-xs px-2 py-1 rounded hover:bg-red-700"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* ✅ Edit Modal */}
       {showModal && selectedProduct && (
@@ -177,7 +226,10 @@ export default function MyProductsPage() {
               <textarea
                 value={selectedProduct.description || ''}
                 onChange={(e) =>
-                  setSelectedProduct({ ...selectedProduct, description: e.target.value })
+                  setSelectedProduct({
+                    ...selectedProduct,
+                    description: e.target.value,
+                  })
                 }
                 className="w-full border rounded p-2"
                 placeholder="Description"
@@ -186,7 +238,10 @@ export default function MyProductsPage() {
                 type="text"
                 value={selectedProduct.category || ''}
                 onChange={(e) =>
-                  setSelectedProduct({ ...selectedProduct, category: e.target.value })
+                  setSelectedProduct({
+                    ...selectedProduct,
+                    category: e.target.value,
+                  })
                 }
                 className="w-full border rounded p-2"
                 placeholder="Category"
@@ -195,7 +250,10 @@ export default function MyProductsPage() {
                 type="text"
                 value={selectedProduct.condition || ''}
                 onChange={(e) =>
-                  setSelectedProduct({ ...selectedProduct, condition: e.target.value })
+                  setSelectedProduct({
+                    ...selectedProduct,
+                    condition: e.target.value,
+                  })
                 }
                 className="w-full border rounded p-2"
                 placeholder="Condition"
@@ -213,7 +271,7 @@ export default function MyProductsPage() {
                 placeholder="Price"
               />
 
-              {/* ✅ Image Upload Section with Preview */}
+              {/* ✅ Image Upload Section */}
               <div className="space-y-2">
                 <label className="block font-medium text-gray-700">Upload New Images</label>
                 <input
@@ -238,19 +296,14 @@ export default function MyProductsPage() {
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   {Array.isArray(selectedProduct.images) &&
                     !replaceImages &&
-                    selectedProduct.images.map((url, idx) => {
-                      const src = url.startsWith('http')
-                        ? url
-                        : `http://127.0.0.1:8000${url.startsWith('/') ? '' : '/'}${url}`;
-                      return (
-                        <img
-                          key={idx}
-                          src={src}
-                          alt="Existing"
-                          className="h-24 w-full object-cover rounded"
-                        />
-                      );
-                    })}
+                    selectedProduct.images.map((url, idx) => (
+                      <img
+                        key={idx}
+                        src={formatImageUrl(url)}
+                        alt="Existing"
+                        className="h-24 w-full object-cover rounded border"
+                      />
+                    ))}
 
                   {newImages.map((file, idx) => (
                     <img

@@ -31,14 +31,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ Upload directory setup
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))  # backend/backend
-UPLOAD_DIR = os.path.join(ROOT_DIR, "uploads")
+# ✅ Correct upload directory
+# 👇 This time we go directly into backend/app/uploads
+BACKEND_ROOT = os.path.dirname(os.path.abspath(__file__))  # backend/app
+UPLOAD_DIR = os.path.join(BACKEND_ROOT, "uploads")  # ✅ correct path
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-print(f"📂 Upload directory: {UPLOAD_DIR}")
+print(f"📂 Serving uploads from: {UPLOAD_DIR}")
 
-# ✅ Serve uploaded files correctly
+# ✅ Serve uploaded files
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # ✅ Include routers

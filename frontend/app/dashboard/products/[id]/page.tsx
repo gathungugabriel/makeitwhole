@@ -16,6 +16,9 @@ interface Product {
   owner_id?: number;
 }
 
+/**
+ * Fetch a single product by ID from the backend API.
+ */
 async function getProduct(id: string, token?: string): Promise<Product | null> {
   try {
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
@@ -27,14 +30,16 @@ async function getProduct(id: string, token?: string): Promise<Product | null> {
     if (!res.ok) return null;
     const data = await res.json();
 
+    // Normalize image_url field
     if (typeof data.image_url === "string") {
       try {
         const parsed = JSON.parse(data.image_url);
-        if (Array.isArray(parsed)) data.image_url = parsed;
+        data.image_url = Array.isArray(parsed) ? parsed : [parsed];
       } catch {
-        /* ignore parse errors */
+        data.image_url = [data.image_url];
       }
     }
+
     return data;
   } catch (error) {
     console.error("❌ Failed to fetch product:", error);
@@ -42,11 +47,7 @@ async function getProduct(id: string, token?: string): Promise<Product | null> {
   }
 }
 
-export default function ProductDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default function ProductDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,6 +58,7 @@ export default function ProductDetailPage({
   const token =
     typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
 
+  // Load current user for ownership check
   useEffect(() => {
     if (!token) return;
     const fetchUser = async () => {
@@ -75,20 +77,23 @@ export default function ProductDetailPage({
     fetchUser();
   }, [token]);
 
+  // Fetch product by ID
   useEffect(() => {
     (async () => {
+      setLoading(true);
       const p = await getProduct(id, token || undefined);
       if (!p) notFound();
       setProduct(p);
       setLoading(false);
     })();
-  }, [id]);
+  }, [id, token]);
 
   async function refreshProduct() {
     const updated = await getProduct(id, token || undefined);
     if (updated) setProduct(updated);
   }
 
+  // Delete image
   async function handleDeleteImage(imageUrl: string) {
     if (!product || !token) return;
     if (!confirm("Are you sure you want to delete this image?")) return;
@@ -106,15 +111,20 @@ export default function ProductDetailPage({
         }
       );
 
-      if (!res.ok) throw new Error("Failed to delete image");
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+
+      setProduct((prev) =>
+        prev ? { ...prev, image_url: data.images || [] } : prev
+      );
       alert("✅ Image deleted successfully!");
-      await refreshProduct();
     } catch (err) {
       console.error("❌ Delete image error:", err);
       alert("❌ Failed to delete image.");
     }
   }
 
+  // Replace image
   async function handleReplaceImage(oldUrl: string) {
     if (!product || !token || !newImageFile) {
       alert("Please select a new image file first.");
@@ -135,10 +145,14 @@ export default function ProductDetailPage({
         }
       );
 
-      if (!res.ok) throw new Error("Failed to replace image");
-      alert("✅ Image replaced successfully!");
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+
+      setProduct((prev) =>
+        prev ? { ...prev, image_url: data.images || [] } : prev
+      );
       setNewImageFile(null);
-      await refreshProduct();
+      alert("✅ Image replaced successfully!");
     } catch (err) {
       console.error("❌ Replace image error:", err);
       alert("❌ Failed to replace image.");
@@ -149,25 +163,15 @@ export default function ProductDetailPage({
   if (!product) return notFound();
 
   const imageUrls: string[] = Array.isArray(product.image_url)
-    ? product.image_url.map((url) =>
-        url.startsWith("http")
-          ? url
-          : `http://127.0.0.1:8000${url.startsWith("/") ? "" : "/"}${url}`
-      )
+    ? (product.image_url as string[])
     : product.image_url
-    ? [
-        product.image_url.startsWith("http")
-          ? product.image_url
-          : `http://127.0.0.1:8000${
-              product.image_url.startsWith("/") ? "" : "/"
-            }${product.image_url}`,
-      ]
+    ? [product.image_url as string]
     : [];
 
   const isHave = product.item_type === "have";
   const badgeText = isHave ? "Have" : "Need";
   const badgeColor = isHave ? "bg-green-600" : "bg-yellow-500";
-  const isOwner = userId && product.owner_id === userId;
+  const isOwner = userId !== null && product.owner_id === userId;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 relative">
@@ -196,6 +200,7 @@ export default function ProductDetailPage({
                   <button
                     onClick={() => handleDeleteImage(src)}
                     className="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700"
+                    title="Delete image"
                   >
                     Delete
                   </button>
@@ -247,6 +252,18 @@ export default function ProductDetailPage({
           </div>
         )}
       </div>
+
+      {/* Product Video */}
+      {product.video_url && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold mb-2">Product Video</h2>
+          <video
+            src={product.video_url}
+            controls
+            className="w-full max-h-[480px] rounded-lg shadow-lg"
+          />
+        </div>
+      )}
 
       {/* Image modal */}
       {selectedImage && (
