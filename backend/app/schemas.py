@@ -142,6 +142,17 @@ class ProductOut(BaseModel):
 # ======================================================
 #                       MATCHES
 # ======================================================
+class MatchBase(BaseModel):
+    product_a_id: int
+    product_b_id: int
+    similarity_score: Optional[float] = None
+
+
+class MatchCreate(MatchBase):
+    """Schema for creating a new match"""
+    pass
+
+
 class MatchOut(BaseModel):
     id: int
     product_a_id: int
@@ -149,8 +160,11 @@ class MatchOut(BaseModel):
     similarity_score: Optional[float]
     date_matched: datetime
 
-    model_config = {"from_attributes": True}
+    # Include full product details if needed for UI
+    product_a: Optional[ProductOut] = None
+    product_b: Optional[ProductOut] = None
 
+    model_config = {"from_attributes": True}
 
 # ======================================================
 #                     AUTH TOKEN
@@ -166,3 +180,17 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     sub: Optional[str] = None
+
+
+# ======================================================
+#                     NOTIFICATIONS
+# ======================================================
+class NotificationOut(BaseModel):
+    id: int
+    user_id: int
+    product_id: Optional[int]
+    message: str
+    is_read: bool
+    date_created: datetime
+
+    model_config = {"from_attributes": True}

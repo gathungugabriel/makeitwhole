@@ -69,7 +69,25 @@ class Match(Base):
     __tablename__ = "matches"
 
     id = Column(Integer, primary_key=True, index=True)
-    product_a_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"))
-    product_b_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"))
-    similarity_score = Column(Float)
-    date_matched = Column(DateTime(timezone=True), server_default=func.now())
+    product_a_id = Column(Integer, ForeignKey("products.id"))
+    product_b_id = Column(Integer, ForeignKey("products.id"))
+    similarity = Column(Float)
+    buyer_id = Column(Integer, ForeignKey("users.id"))
+    seller_id = Column(Integer, ForeignKey("users.id"))
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+    product_a = relationship("Product", foreign_keys=[product_a_id])
+    product_b = relationship("Product", foreign_keys=[product_b_id])
+    buyer = relationship("User", foreign_keys=[buyer_id])
+    seller = relationship("User", foreign_keys=[seller_id])
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    message = Column(String)
+    match_id = Column(Integer, ForeignKey("matches.id"), nullable=True)
+    read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)

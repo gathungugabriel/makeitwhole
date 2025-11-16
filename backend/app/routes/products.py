@@ -10,6 +10,7 @@ import shutil
 import json
 import cloudinary
 import cloudinary.uploader
+from app.routes.match import find_and_store_matches
 
 from app import models, schemas
 from app.database import get_db
@@ -158,6 +159,14 @@ async def create_product(
     db.add(new_product)
     db.commit()
     db.refresh(new_product)
+
+    # ✅ Find and store matches automatically
+    try:
+        find_and_store_matches(db, new_product)
+        print(f"🔍 Match check completed for product {new_product.id} ({new_product.name})")
+    except Exception as e:
+        print(f"⚠️ Match generation failed for product {new_product.id}: {e}")
+
     _product_response_normalize(new_product)
     return new_product
 
@@ -247,6 +256,7 @@ async def update_product(
     if product.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
+    # --- Update product fields ---
     if name is not None: product.name = name
     if description is not None: product.description = description
     if category is not None: product.category = category
@@ -255,6 +265,7 @@ async def update_product(
     if price is not None: product.price = price
     if quantity is not None: product.quantity = quantity
 
+    # --- Handle images ---
     existing_images: List[str] = []
     if product.image_url:
         try:
@@ -280,6 +291,7 @@ async def update_product(
             new_store = existing_images + uploaded_images
             product.image_url = json.dumps(_normalize_list_for_storage(new_store))
 
+    # --- Handle video ---
     if video:
         if product.video_url:
             old_rel = to_relative_path(product.video_url)
@@ -302,6 +314,14 @@ async def update_product(
 
     db.commit()
     db.refresh(product)
+
+    # ✅ Run match generation again after product update
+    try:
+        find_and_store_matches(db, product)
+        print(f"🔁 Match re-evaluation completed for updated product {product.id} ({product.name})")
+    except Exception as e:
+        print(f"⚠️ Match re-evaluation failed for product {product.id}: {e}")
+
     _product_response_normalize(product)
     return product
 

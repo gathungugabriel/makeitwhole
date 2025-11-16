@@ -7,6 +7,8 @@ from app.database import Base, engine
 from app import models
 from app.routes import users, products
 from app import routes_auth
+from app.routes import match
+
 
 # ✅ Initialize FastAPI
 app = FastAPI(title="MakeItWhole API", version="1.0")
@@ -46,6 +48,7 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 app.include_router(routes_auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(users.router, prefix="/users", tags=["Users"])
 app.include_router(products.router, prefix="/products", tags=["Products"])
+app.include_router(match.router, prefix="/matches", tags=["Matches"])
 
 # ✅ Root route
 @app.get("/")
